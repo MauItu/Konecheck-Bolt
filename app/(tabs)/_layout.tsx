@@ -18,9 +18,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="manual_entry"
         options={{
-          title: 'Historial',
+          title: 'Ingreso Manual',
           tabBarIcon: ({ size, color }) => (
             <List size={size} color={color} />
           ),
