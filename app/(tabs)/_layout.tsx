@@ -18,7 +18,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="manual_entry"
+        name="login"
         options={{
           title: 'Ingreso Manual',
           tabBarIcon: ({ size, color }) => (
