@@ -1,109 +1,89 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Camera, X } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import { Shield } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
-export default function ScannerScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const [barcode, setBarcode] = useState<string | null>(null);
+export default function LoginPage() {
+  const [identification, setIdentification] = useState('');
+  const [password, setPassword] = useState('');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const router = useRouter();
 
-  if (!permission) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Cargando cámara...</Text>
-      </View>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Camera size={80} color="#007AFF" />
-        <Text style={styles.messageTitle}>Permiso de Cámara</Text>
-        <Text style={styles.message}>
-          Necesitamos acceso a tu cámara para escanear códigos de barras
-        </Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Permitir Acceso</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
-    setScanned(true);
-    setBarcode(data);
-
-    Alert.alert(
-      'Código Escaneado',
-      `Tipo: ${type}\nCódigo: ${data}`,
-      [
-        {
-          text: 'Escanear Otro',
-          onPress: () => {
-            setScanned(false);
-            setBarcode(null);
-          },
-        },
-      ]
-    );
+  const handleLogin = () => {
+    console.log('Intentando iniciar sesión con:', identification, password);
+    //router.push('/scanner');
   };
 
   return (
     <View style={styles.container}>
-      {!scanned ? (
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          barcodeScannerSettings={{
-            barcodeTypes: [
-              'aztec',
-              'ean13',
-              'ean8',
-              'qr',
-              'pdf417',
-              'upc_e',
-              'datamatrix',
-              'code39',
-              'code93',
-              'itf14',
-              'codabar',
-              'code128',
-              'upc_a',
-            ],
-          }}
-          onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-        >
-          <View style={styles.overlay}>
-            <View style={styles.scanArea}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
-            </View>
-            <Text style={styles.instruction}>
-              Apunta al código de barras para escanearlo
+      {/* Efectos de fondo */}
+      <View style={styles.backgroundBubble1} />
+      <View style={styles.backgroundBubble2} />
+
+      {/* Contenedor principal */}
+      <View style={styles.card}>
+        {/* Encabezado */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Shield size={40} color="white" strokeWidth={2.5} />
+          </View>
+          <Text style={styles.title}>KonCheck</Text>
+          <Text style={styles.subtitle}>Sistema de Consulta</Text>
+        </View>
+
+        {/* Formulario */}
+        <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Identificación</Text>
+            <TextInput
+              style={[
+                styles.input,
+                focusedField === 'identification' && styles.inputFocused
+              ]}
+              onFocus={() => setFocusedField('identification')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={setIdentification}
+              value={identification}
+              placeholder="Ingrese su identificación"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Contraseña</Text>
+            <TextInput
+              style={[
+                styles.input,
+                focusedField === 'password' && styles.inputFocused
+              ]}
+              onFocus={() => setFocusedField('password')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={setPassword}
+              value={password}
+              placeholder="Ingrese su contraseña"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.button}
+            activeOpacity={0.8}
+            onPress={handleLogin}
+          >
+            <Text style={styles.buttonText}>INGRESAR</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Pie de página */}
+        <View style={styles.footer}>
+          <View style={styles.footerContainer}>
+            <Text style={styles.footerText}>
+              🛡️ Sistema exclusivo para Personal de la Fuerza Pública
             </Text>
           </View>
-        </CameraView>
-      ) : (
-        <View style={styles.resultContainer}>
-          <View style={styles.resultCard}>
-            <Text style={styles.resultTitle}>Código Escaneado</Text>
-            <Text style={styles.resultBarcode}>{barcode}</Text>
-            <TouchableOpacity
-              style={styles.scanAgainButton}
-              onPress={() => {
-                setScanned(false);
-                setBarcode(null);
-              }}
-            >
-              <Text style={styles.scanAgainText}>Escanear Otro Código</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -111,131 +91,147 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
+    backgroundColor: '#388e3c',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    padding: 16,
   },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
+  backgroundBubble1: {
+    position: 'absolute',
+    top: -100,
+    right: -50,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    transform: [{ scale: 1.2 }],
   },
-  messageTitle: {
-    fontSize: 24,
+  backgroundBubble2: {
+    position: 'absolute',
+    bottom: -150,
+    left: -100,
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    transform: [{ scale: 1.2 }],
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#388e3c',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#388e3c',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4.65,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  title: {
+    fontSize: 30,
     fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 20,
-    marginBottom: 10,
+    color: '#388e3c',
+    marginBottom: 8,
   },
-  message: {
-    color: '#fff',
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  form: {
+    gap: 20,
+  },
+  inputContainer: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  input: {
+    width: '100%',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
+    color: '#1F2937',
+  },
+  inputFocused: {
+    borderColor: '#388e3c',
+    backgroundColor: '#F0F9F0',
   },
   button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 10,
+    backgroundColor: '#388e3c',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#388e3c',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4.65,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   buttonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  camera: {
-    flex: 1,
-    width: '100%',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
+  footer: {
+    marginTop: 28,
     alignItems: 'center',
   },
-  scanArea: {
-    width: 250,
-    height: 250,
-    position: 'relative',
-  },
-  corner: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: '#007AFF',
-  },
-  topLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-  },
-  topRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-  },
-  bottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-  },
-  bottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-  },
-  instruction: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 40,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  footerContainer: {
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  resultContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  resultCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 30,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  resultTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 20,
-  },
-  resultBarcode: {
-    fontSize: 18,
-    color: '#007AFF',
-    marginBottom: 30,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  scanAgainButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 10,
-  },
-  scanAgainText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  footerText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
