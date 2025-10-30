@@ -2,7 +2,7 @@
 
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { useState } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { Camera, CheckCircle } from "lucide-react-native"
 
 export default function ScannerScreen() {
@@ -38,16 +38,6 @@ export default function ScannerScreen() {
   const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
     setScanned(true)
     setBarcode(data)
-
-    Alert.alert("Código Escaneado", `Tipo: ${type}\nCódigo: ${data}`, [
-      {
-        text: "Escanear Otro",
-        onPress: () => {
-          setScanned(false)
-          setBarcode(null)
-        },
-      },
-    ])
   }
 
   return (
