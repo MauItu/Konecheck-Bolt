@@ -17,9 +17,9 @@ export default function TabLayout() {
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
-          height: 60,
+          //height: 60,
           paddingBottom: 8,
-          paddingTop: 8,
+          paddingTop: 4,
         },
         tabBarLabelStyle: {
           fontSize: 12,
