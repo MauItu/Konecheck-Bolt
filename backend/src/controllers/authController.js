@@ -1,4 +1,4 @@
-// Auth Controller - Manejo de autenticación y sesiones
+// Auth Controller - Manejo de autenticación y sesion
 const { validateEmail, validatePassword } = require("../utils/validators")
 
 class AuthController {
