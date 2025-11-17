@@ -1,0 +1,67 @@
+{
+  "info": {
+    "name": "Backend API Collection",
+    "description": "Colección de endpoints para testear el backend"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "http://localhost:3000/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"test@example.com\",\"password\":\"Password123\",\"nombre\":\"Test User\"}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": "http://localhost:3000/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"test@example.com\",\"password\":\"Password123\"}"
+            }
+          }
+        },
+        {
+          "name": "Verificar Sesión",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:3000/api/auth/verificar-sesion",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer YOUR_TOKEN_HERE"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ciudadanos",
+      "item": [
+        {
+          "name": "Listar",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:3000/api/ciudadanos"
+          }
+        },
+        {
+          "name": "Buscar",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:3000/api/ciudadanos/buscar?nombre=Juan&cedula=12345678"
+          }
+        }
+      ]
+    }
+  ]
+}

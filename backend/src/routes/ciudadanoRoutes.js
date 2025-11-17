@@ -1,7 +1,7 @@
 // Ciudadano Routes - Endpoints de búsqueda y filtrado
 const express = require("express")
 const router = express.Router()
-const ciudadanoController = require("../controllers/ciudadano-controller")
+const ciudadanoController = require("../controllers/ciudadanoController")
 const authMiddleware = require("../middleware/auth-middleware")
 
 // Requieren autenticación

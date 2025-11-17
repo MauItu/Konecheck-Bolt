@@ -1,7 +1,7 @@
 // Usuario Routes - Endpoints CRUD de usuarios
 const express = require("express")
 const router = express.Router()
-const usuarioController = require("../controllers/usuario-controller")
+const usuarioController = require("../controllers/usuarioController")
 const authMiddleware = require("../middleware/auth-middleware")
 
 // Todas las rutas requieren autenticación
