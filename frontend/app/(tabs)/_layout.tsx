@@ -27,13 +27,7 @@ export default function TabLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Login",
-          tabBarIcon: ({ size, color }) => <List size={size} color={color} />,
-        }}
-      />
+      
       <Tabs.Screen
         name="camara_scann"
         options={{

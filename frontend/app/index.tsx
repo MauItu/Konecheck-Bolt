@@ -1,17 +1,106 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Shield } from 'lucide-react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Dimensions, 
+  Platform, 
+  Alert 
+} from 'react-native';
+import { 
+  Shield, 
+  Loader 
+} from 'lucide-react-native'; 
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store'; 
+
+
+// ------------------------------------------------------------------
+// ⚠️ CONFIGURACIÓN CRÍTICA: BASE URL DEL BACKEND 
+// Reemplaza esto con la IP de tu máquina y el puerto 3000.
+// Ejemplo: 'http://192.168.1.10:3000/api'
+const API_BASE_URL = 'http://192.168.5.107:3000/api'; 
+// ------------------------------------------------------------------
+
+
+// Función auxiliar para guardar el token de forma condicional
+// Esto resuelve el error en el navegador (web) y usa SecureStore en nativo.
+async function saveToken(token: string) {
+  if (Platform.OS === 'web') {
+    // Advertencia: Usar localStorage en la web no es seguro para producción.
+    console.log("Usando localStorage para guardar el token en la web (solo desarrollo).");
+    localStorage.setItem('userToken', token);
+  } else {
+    // iOS y Android (Seguro)
+    await SecureStore.setItemAsync('userToken', token);
+  }
+}
+
 
 export default function LoginPage() {
   const [identification, setIdentification] = useState('');
   const [password, setPassword] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); 
   const router = useRouter();
 
-  const handleLogin = () => {
-    console.log('Intentando iniciar sesión con:', identification, password);
-    //router.push('/scanner');
+
+  const handleLogin = async () => {
+    // 1. Prevenir doble envío y validar campos
+    if (isLoading) return; 
+
+    if (!identification || !password) {
+        Alert.alert("Error", "Debe ingresar su identificación y contraseña.");
+        return;
+    }
+    
+    setIsLoading(true); // Activa el indicador de carga
+
+    try {
+        // 2. Realizar la petición POST al endpoint de Login
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                identificacion: identification, 
+                password: password,           
+            }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // 3. Login Exitoso (Status 200)
+            
+            // Guardar el JWT Token de forma segura/condicional
+            await saveToken(data.token); 
+
+            // 4. Navegación a la cámara scanner
+            // Usamos 'replace' para que no pueda volver a Login con el botón atrás
+            router.replace('/camara_scann'); 
+            
+            // Limpiar campos
+            setIdentification('');
+            setPassword('');
+        } else {
+            // 5. Login Fallido (Status 400, 401, 404, etc.)
+            const errorMessage = data.mensaje || 'Credenciales inválidas o error desconocido.';
+            Alert.alert("Error de Login", errorMessage);
+        }
+    } catch (error) {
+        // 6. Error de Red/Servidor
+        console.error('Error de conexión:', error);
+        Alert.alert(
+            "Error de Conexión", 
+            "No se pudo conectar con el servidor. Verifique la URL de la API y su conexión."
+        );
+    } finally {
+        setIsLoading(false); // Desactiva el indicador de carga
+    }
   };
 
   return (
