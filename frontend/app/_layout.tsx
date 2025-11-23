@@ -8,6 +8,7 @@ export default function RootLayout() {
 
   return (
     <>
+      {/* Definir las pantallas de la pila de navegación */}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
