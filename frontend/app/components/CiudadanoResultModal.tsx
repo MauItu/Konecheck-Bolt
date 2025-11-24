@@ -2,39 +2,52 @@ import type React from "react"
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from "react-native"
 import { CheckCircle, XCircle, User } from "lucide-react-native"
 
-// Nueva interfaz para datos PARSEADOS localmente
+// Interfaz que coincide con la respuesta del backend (que tiene judicialStatus)
 interface CiudadanoData {
   identificacion: string
   nombres: string
   apellidos: string
-  fecha_nacimiento: string
-  lugar_nacimiento: string
-  rh: string
-  tipo_documento: string
-  parsingSuccess: boolean
+  estado_judicial: string // Estado sin procesar de la BD
+  fecha_nacimiento?: string
+  lugar_nacimiento?: string
+  rh?: string
+  // Propiedad opcional proveniente del hook enriquecido (useCiudadanoSearch)
+  judicialStatus?: {
+    label: string
+    color: string
+    isRequired: boolean
+  }
 }
 
 interface CiudadanoResultModalProps {
   visible: boolean
   ciudadano: CiudadanoData | null
-  // Ya no necesitamos 'error', el fallo de parsing es manejado en 'ciudadano'
+  error: string | null // Volvemos a incluir el error
   onClose: () => void
 }
 
-const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ciudadano, onClose }) => {
-  
-  // Comprobación para el caso de fallo total
-  const parsingFailed = !ciudadano || !ciudadano.parsingSuccess
+const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ciudadano, error, onClose }) => {
+  // Usar la propiedad judicialStatus si está disponible (viene del hook)
+  const judicial = ciudadano?.judicialStatus
 
-  const nombreCompleto = ciudadano ? `${ciudadano.nombres} ${ciudadano.apellidos}` : "DATOS NO ENCONTRADOS"
+  // Determinar si es requerido: prioridad -> error, luego judicial.isRequired si existe, si no, fallback
+  const fallbackRequerido =
+    ciudadano?.estado_judicial?.toUpperCase().includes("REQUERIDO") ||
+    ciudadano?.estado_judicial?.toUpperCase().includes("ACTIVO")
+
+  const isRequerido = Boolean(error) ? true : (judicial ? judicial.isRequired : fallbackRequerido)
+
+  const estadoLabel = judicial ? judicial.label : ciudadano?.estado_judicial || "SIN ESTADO DEFINIDO"
+  const estadoColor = judicial ? judicial.color : (isRequerido ? "#D32F2F" : "#388E3C")
+
+  const nombreCompleto = ciudadano ? `${ciudadano.nombres} ${ciudadano.apellidos}` : "N/A"
   const cedulaFormateada = ciudadano?.identificacion || "N/A"
 
-  // Estilos y labels basados en el resultado del parsing
-  const statusColor = parsingFailed ? "#D32F2F" : "#388E3C"
-  const statusLabel = parsingFailed ? "FALLO DE LECTURA" : "LECTURA EXITOSA"
-  const mensajeEstado = parsingFailed 
-    ? "No se pudo extraer toda la información del documento. Intente de nuevo o verifique la iluminación."
-    : "Información extraída directamente del código de barras (PDF417)."
+  const statusTitle = isRequerido ? "¡ATENCIÓN: REQUERIDO!" : "Sin Novedad Judicial"
+  const statusIcon = isRequerido ? <XCircle size={32} color="white" /> : <CheckCircle size={32} color="white" />
+  const statusMessage = isRequerido
+    ? `El ciudadano presenta el estado: ${estadoLabel}. Se recomienda proceder con cautela.`
+    : `El ciudadano figura con estado: ${estadoLabel}.`;
 
   return (
     <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
@@ -42,19 +55,23 @@ const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ci
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.modalView}>
 
-            <Text style={styles.mainTitle}>{statusLabel}</Text>
+            {/* Encabezado de Estado Judicial */}
+            <View style={[styles.statusHeader, { backgroundColor: estadoColor }]}>
+                {statusIcon}
+                <Text style={styles.statusHeaderText}>{statusTitle}</Text>
+            </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Datos del Documento ({ciudadano?.tipo_documento || 'PDF417'})</Text>
+              <Text style={styles.cardTitle}>Información del Ciudadano (BD)</Text>
 
-              {parsingFailed ? (
-                // Mostrar error si el parsing falló
+              {error ? (
+                // Mostrar error si la consulta a la BD falló
                 <View style={styles.errorContainer}>
-                    <XCircle size={40} color={statusColor} />
-                    <Text style={[styles.errorText, { color: statusColor }]}>{mensajeEstado}</Text>
+                    <XCircle size={40} color="#D32F2F" />
+                    <Text style={styles.errorText}>Error de Búsqueda: {error}</Text>
                 </View>
               ) : (
-                // Mostrar datos si el parsing fue exitoso
+                // Mostrar datos si la consulta fue exitosa
                 <>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Nombre Completo:</Text>
@@ -66,32 +83,28 @@ const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ci
                     <Text style={styles.infoValue}>{cedulaFormateada}</Text>
                   </View>
                   
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Fecha Nacimiento:</Text>
-                    <Text style={styles.infoValue}>{ciudadano.fecha_nacimiento}</Text>
-                  </View>
+                  {/* Se muestran estos campos si vienen de la BD, aunque no son obligatorios en la interfaz */}
+                  {ciudadano?.fecha_nacimiento && (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>Fecha Nacimiento:</Text>
+                      <Text style={styles.infoValue}>{ciudadano.fecha_nacimiento}</Text>
+                    </View>
+                  )}
                   
                   <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Lugar Nacimiento:</Text>
-                    <Text style={styles.infoValue}>{ciudadano.lugar_nacimiento}</Text>
+                    <Text style={styles.infoLabel}>Estado Judicial (Raw):</Text>
+                    <Text style={styles.infoValue}>{ciudadano?.estado_judicial || 'N/A'}</Text>
                   </View>
-                  
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>RH:</Text>
-                    <Text style={styles.infoValue}>{ciudadano.rh}</Text>
-                  </View>
-
-                  <View style={styles.statusContainer}>
-                    <CheckCircle size={24} color={statusColor} strokeWidth={2.5} fill={statusColor} />
-                    <Text style={[styles.statusText, { color: statusColor }]}>Datos Extraídos Localmente</Text>
-                  </View>
-                  <Text style={styles.statusMessage}>{mensajeEstado}</Text>
                 </>
               )}
             </View>
+            
+            <View style={styles.statusMessageCard}>
+                <Text style={styles.statusMessageText}>{statusMessage}</Text>
+            </View>
 
             <TouchableOpacity style={styles.button} onPress={onClose}>
-              <Text style={styles.buttonText}>Nueva Lectura</Text>
+              <Text style={styles.buttonText}>Cerrar / Nueva Lectura</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -103,46 +116,52 @@ const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ci
 const styles = StyleSheet.create({
   centeredView: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "flex-start",
-    paddingVertical: 40,
+    justifyContent: "center",
   },
   modalView: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 500,
-    alignSelf: "center",
-  },
-  mainTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#4CAF50",
-    marginBottom: 30,
-    textAlign: "center",
-    width: "100%",
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
+    margin: 20,
+    backgroundColor: "white",
     borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    marginBottom: 30,
+    overflow: 'hidden',
+    alignItems: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
       },
       android: {
-        elevation: 4,
+        elevation: 10,
       },
     }),
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
+    justifyContent: 'center',
+    gap: 10,
+    // El color de fondo se define dinámicamente
+  },
+  statusHeaderText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    padding: 24,
+    width: "100%",
+    // Bordes suavizados para no chocar con el header
+    borderBottomLeftRadius: 16, 
+    borderBottomRightRadius: 16,
   },
   cardTitle: {
     fontSize: 18,
@@ -158,8 +177,8 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#4CAF50", // Cambio de color para resaltar
+    fontWeight: "600",
+    color: "#424242",
     marginBottom: 2,
   },
   infoValue: {
@@ -167,24 +186,17 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: "#424242",
   },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 16,
-    marginBottom: 12,
-    gap: 8,
+  statusMessageCard: {
+      backgroundColor: '#F5F5F5',
+      padding: 15,
+      width: '100%',
+      // borderTopWidth: 1,
+      // borderTopColor: '#E0E0E0',
   },
-  statusText: {
+  statusMessageText: {
     fontSize: 14,
-    fontWeight: "700",
-    flex: 1,
-  },
-  statusMessage: {
-    fontSize: 13,
-    fontWeight: "400",
-    color: "#616161",
-    lineHeight: 18,
-    paddingTop: 5,
+    color: '#616161',
+    textAlign: 'center',
   },
   errorContainer: {
     alignItems: 'center',
@@ -195,25 +207,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 10,
+    color: "#D32F2F"
   },
   button: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#388E3C",
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 40,
-    width: "100%",
+    width: "90%",
     maxWidth: 300,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    marginVertical: 20,
   },
   buttonText: {
     color: "#FFFFFF",

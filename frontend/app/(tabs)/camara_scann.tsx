@@ -1,81 +1,76 @@
 "use client"
 
 import { CameraView, useCameraPermissions } from "expo-camera"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform } from "react-native"
 import { Camera, CheckCircle, RefreshCw, Zap, ZapOff } from "lucide-react-native"
 import { useIsFocused } from "@react-navigation/native" 
-// import { useCiudadanoSearch } from "@/hooks/useCiudadanoSearch" // REMOVIDO
+// Importación del hook y la interfaz (ahora disponible)
+import { useCiudadanoSearch, CiudadanoData } from "@/hooks/useCiudadanoSearch" 
 import CiudadanoResultModal from "../components/CiudadanoResultModal"
 
-// Nueva interfaz (debe coincidir con la del Modal)
-interface CiudadanoData {
-  identificacion: string
-  nombres: string
-  apellidos: string
-  fecha_nacimiento: string
-  lugar_nacimiento: string
-  rh: string
-  tipo_documento: string
-  parsingSuccess: boolean
+// Interface temporal para el resultado del parsing de ID 
+interface ParsedIdResult {
+  identificacion: string;
+  parsingSuccess: boolean;
 }
 
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
-  // Ahora almacenamos el objeto de datos completo, no solo la ID
-  const [ciudadanoData, setCiudadanoData] = useState<CiudadanoData | null>(null) 
+  const [barcode, setBarcode] = useState<string | null>(null) // ID para la búsqueda
   const [modalVisible, setModalVisible] = useState(false)
   const [torch, setTorch] = useState(false) 
   
   const isFocused = useIsFocused()
-  // const { searchCiudadano, ciudadano, error, isLoading } = useCiudadanoSearch() // REMOVIDO
+  const { searchCiudadano, ciudadano, error, isLoading } = useCiudadanoSearch() 
 
-  // Efecto para mostrar el modal inmediatamente después de escanear y parsear
+  // Efecto para abrir el modal cuando la búsqueda termina (con o sin error/datos)
   useEffect(() => {
-    if (scanned && ciudadanoData) {
-      setModalVisible(true);
-    } else if (scanned && !ciudadanoData) {
-      // Si escaneó pero el parsing falló, forzamos el modal de error
+    if (scanned && !isLoading && (ciudadano || error || barcode === null)) {
       setModalVisible(true);
     }
-  }, [scanned, ciudadanoData]);
+  }, [ciudadano, error, isLoading, scanned]);
 
+  // Efecto para resetear el estado cuando la pantalla gana foco (vuelve a la pestaña)
   useEffect(() => {
     if (isFocused) {
       setScanned(false);
-      setCiudadanoData(null);
+      setBarcode(null);
     }
   }, [isFocused]);
 
-  if (!permission) {
-    return <View style={styles.container} />
-  }
-
-  if (!permission.granted) {
+  if (!permission || !permission.granted) {
+    if (!permission) return <View style={styles.container} />
     return (
-      <View style={styles.permissionContainer}>
-        <Camera size={56} color="#388E3C" />
-        <Text style={styles.messageTitle}>Permiso Requerido</Text>
-        <Text style={styles.message}>Necesitas activar el permiso de cámara en la configuración del dispositivo.</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Solicitar Permiso</Text>
-        </TouchableOpacity>
-      </View>
-    )
+        <View style={styles.permissionContainer}>
+            <Camera size={56} color="#388E3C" />
+            <Text style={styles.messageTitle}>Permiso Requerido</Text>
+            <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+                <Text style={styles.buttonText}>Solicitar Permiso</Text>
+            </TouchableOpacity>
+        </View>
+    );
   }
 
   const handleBarcodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return
     
-    // console.log(`Raw Data Scanned: ${data}`); // DEBUG: Descomentar para ver la trama cruda
+    // Extraemos la ID usando la lógica mejorada 
+    const cedulaIdentificada = parseCedulaId(data, type);
 
-    const parsedData = parseCedulaData(data, type);
-
-    setScanned(true)
-    Vibration.vibrate()
-    setCiudadanoData(parsedData)
-    // Ya NO se llama a searchCiudadano, solo se muestra el modal.
+    if (cedulaIdentificada.parsingSuccess && cedulaIdentificada.identificacion !== 'N/A') {
+      setScanned(true)
+      Vibration.vibrate()
+      setBarcode(cedulaIdentificada.identificacion)
+      // Usamos el ID correcto para buscar en la BD
+      await searchCiudadano(cedulaIdentificada.identificacion); 
+    } else {
+        // Fallo en la extracción de la ID
+        setScanned(true); 
+        setBarcode(null);
+        setModalVisible(true); 
+    }
   }
 
   return (
@@ -107,31 +102,46 @@ export default function ScannerScreen() {
             </TouchableOpacity>
 
             <Text style={styles.instruction}>
-              Apunta al código. La lectura exitosa mostrará los datos del documento.
+              Apunta al código. La lectura exitosa consultará tu BD.
             </Text>
           </View>
         </CameraView>
       )}
 
-      {/* VISTA DE CARGA (Ahora solo es una pantalla de espera mientras se abre el modal) */}
+      {/* Pantalla de Carga/Resultado */}
       {scanned && !modalVisible && (
         <View style={styles.resultContainer}>
           <View style={styles.resultCard}>
-            <View style={{alignItems: 'center'}}>
-                  <RefreshCw size={40} color="#388E3C" className="animate-spin" />
-                  <Text style={{marginTop: 15}}>Procesando datos...</Text>
-            </View>
+             {isLoading ? (
+               <View style={{alignItems: 'center'}}>
+                  <RefreshCw size={40} color="#388E3C" style={{ opacity: 1 }} />
+                  <Text style={{marginTop: 15, fontSize: 16, fontWeight: '600'}}>Consultando {barcode || 'ID...'} en BD...</Text>
+               </View>
+             ) : (
+                <View style={{alignItems: 'center'}}>
+                    <CheckCircle size={40} color="#388E3C" />
+                    <Text style={styles.resultTitle}>Búsqueda Finalizada</Text>
+                    <Text style={styles.barcodeText}>ID: {barcode || 'N/A'}</Text>
+                    <TouchableOpacity 
+                        style={styles.scanAgainButton} 
+                        onPress={() => setScanned(false)}
+                    >
+                        <Text style={styles.buttonText}>Escanear de nuevo</Text>
+                    </TouchableOpacity>
+                </View>
+             )}
           </View>
         </View>
       )}
 
       <CiudadanoResultModal
         visible={modalVisible}
-        ciudadano={ciudadanoData}
+        ciudadano={ciudadano} 
+        // Mostrar error de hook, o un error de parsing si se escaneó pero no se extrajo ID
+        error={error || (scanned && barcode === null ? "No se pudo extraer una ID válida del código de barras. Intente de nuevo." : null)} 
         onClose={() => {
           setModalVisible(false)
           setScanned(false)
-          setCiudadanoData(null)
         }}
       />
     </View>
@@ -139,90 +149,45 @@ export default function ScannerScreen() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* FUNCIÓN DE PARSEO COMPLETO DE CÉDULA (PDF417)                              */
+/* FUNCIÓN DE PARSEO DE ID (Prioriza la cédula sobre el serial)               */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Intenta extraer todos los campos de datos de la cédula colombiana (PDF417).
- * Utiliza heurística de limpieza y separación común para esta trama.
+ * Extrae SOLO el número de identificación, priorizando el segundo número largo
+ * para evitar capturar el número de serie (ej. 1070803300).
  */
-function parseCedulaData(raw: string, type: string): CiudadanoData | null {
-  
-  const baseData: CiudadanoData = {
-    identificacion: 'N/A', nombres: 'N/A', apellidos: 'N/A', 
-    fecha_nacimiento: 'N/A', lugar_nacimiento: 'N/A', rh: 'N/A', 
-    tipo_documento: 'N/A', parsingSuccess: false
-  };
+function parseCedulaId(raw: string, type: string): ParsedIdResult {
+    const base: ParsedIdResult = { identificacion: 'N/A', parsingSuccess: false };
 
-  if (type === 'pdf417') {
-    // 1. Limpieza y estandarización del separador: 
-    // Reemplaza caracteres de control (\u001D, \r, etc.) y no alfanuméricos con un pipe (|).
-    // Esto es vital para manejar la trama sucia del PDF417.
-    const cleanedRaw = raw
-      .replace(/[^a-zA-Z0-9\s-/\.]/g, '|')
-      .replace(/\|{2,}/g, '|') // Consolida múltiples separadores
-      .replace(/^\||\|$/g, ''); // Remueve separadores al inicio/fin
+    if (type === 'pdf417') {
+        // 1. INTENTO ESPECÍFICO: Buscar el patrón "0P"
+        const match0P = raw.match(/0P\d*(\d{7,10})/);
+        if (match0P && match0P[1]) {
+            return { identificacion: match0P[1], parsingSuccess: true };
+        }
 
-    const parts = cleanedRaw.split('|').filter(p => p.trim() !== '');
+        // 2. INTENTO HEURÍSTICO AVANZADO: Tomar la segunda secuencia larga
+        // allNumericSequences[0] -> Serial (1070803300)
+        // allNumericSequences[1] -> Cédula (79466685)
+        const allNumericSequences = Array.from(raw.matchAll(/\d{7,10}/g), m => m[0]);
+        
+        if (allNumericSequences.length >= 2) {
+            return { identificacion: allNumericSequences[1], parsingSuccess: true };
+        } 
+        
+        if (allNumericSequences.length === 1) {
+            // Fallback: Si solo hay un número largo, asumimos que es la ID.
+            return { identificacion: allNumericSequences[0], parsingSuccess: true };
+        }
+    }
     
-    // Si la CC está estructurada por menos de 10 campos clave, el parsing es dudoso.
-    if (parts.length < 10) return {...baseData, tipo_documento: 'PDF417', parsingSuccess: false};
-
-    // Heurística de la CC Colombiana (Índices aproximados después del split):
-    // 0: Serial (ej: 033...)
-    // 1: Identificacion (ID)
-    // 2: Apellido 1
-    // 3: Apellido 2
-    // 4: Nombre 1
-    // 5: Nombre 2
-    // 7: Fecha Nacimiento (DD/MM/AAAA)
-    // 8: Lugar Nacimiento (ej: BOGOTA)
-    // 9: RH (ej: O+)
-    
-    // Asignación de datos
-    const result: CiudadanoData = {
-        ...baseData,
-        identificacion: parts[1] || baseData.identificacion,
-        apellidos: `${parts[2] || ''} ${parts[3] || ''}`.trim(),
-        nombres: `${parts[4] || ''} ${parts[5] || ''}`.trim(),
-        fecha_nacimiento: parts[7] || baseData.fecha_nacimiento,
-        lugar_nacimiento: parts[8] || baseData.lugar_nacimiento,
-        rh: parts[9] || baseData.rh,
-        tipo_documento: 'C.C. (PDF417)',
-        parsingSuccess: true
-    };
-    
-    // VALIDACIÓN CRÍTICA: Reasegurar la ID si el índice 1 era el número de serie
-    if (!/^\d{7,10}$/.test(result.identificacion)) {
-         // Si el índice 1 falló, intentamos tomar el SEGUNDO número largo de la trama original.
-         const allNumeric = Array.from(raw.matchAll(/\d{7,10}/g), m => m[0]);
-         if (allNumeric.length >= 2) {
-             result.identificacion = allNumeric[1]; // El segundo es la ID
-         } else {
-             // Falló la extracción de ID
-             result.parsingSuccess = false; 
-         }
+    // Lógica para QR u otros (solo busca el primer número largo)
+    else {
+        const match = raw.match(/\d{7,10}/);
+        if (match) return { identificacion: match[0], parsingSuccess: true };
     }
 
-    return result;
-  }
-  
-  // Lógica para QR (Solo ID, los demás campos serán 'N/A' si no hay BD)
-  if (type === 'qr') {
-      const idMatch = raw.match(/\d{7,10}/);
-      if (idMatch) {
-          return {
-            ...baseData,
-            identificacion: idMatch[0],
-            nombres: 'Datos no disponibles',
-            apellidos: 'Localmente',
-            tipo_documento: 'QR',
-            parsingSuccess: true
-          }
-      }
-  }
-
-  return {...baseData, tipo_documento: type, parsingSuccess: false};
+    return base;
 }
 
 const styles = StyleSheet.create({
@@ -247,4 +212,7 @@ const styles = StyleSheet.create({
   
   resultContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
   resultCard: { backgroundColor: 'white', padding: 30, borderRadius: 15, width: '80%', alignItems: 'center' },
+  resultTitle: { fontSize: 18, fontWeight: 'bold', marginVertical: 15 },
+  barcodeText: { fontSize: 18, fontWeight: '600', color: '#388E3C' },
+  scanAgainButton: { backgroundColor: '#388E3C', padding: 10, borderRadius: 8, marginTop: 10 }
 })

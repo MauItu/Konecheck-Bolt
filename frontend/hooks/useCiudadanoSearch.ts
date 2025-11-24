@@ -5,7 +5,8 @@ import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router'; // Necesitas el router para redirigir si el token falla
 
 // Define la estructura de datos que esperas recibir del backend
-interface CiudadanoData {
+// 🔥 CORRECCIÓN CLAVE: Se añade 'export' a la interfaz
+export interface CiudadanoData { 
   identificacion: string;
   nombres: string;
   apellidos: string;
@@ -20,7 +21,7 @@ interface CiudadanoData {
 }
 
 // ⚠️ IMPORTANTE: Reemplaza [TU_IP_AQUI] con la IP Local de tu PC
-const API_BASE_URL = 'http://192.168.5.107:3000/api'; 
+const API_BASE_URL = 'http://192.168.26.137:3000/api'; 
 
 
 // ----------------------------------------------------------------------
