@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from "react-native"
 import { Shield, Loader } from "lucide-react-native"

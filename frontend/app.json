@@ -20,7 +20,8 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
-      "expo-barcode-scanner"
+      "expo-barcode-scanner",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
