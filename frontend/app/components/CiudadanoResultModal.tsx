@@ -68,12 +68,14 @@ const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ci
       <View style={styles.centeredView}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.modalView}>
-            <View style={styles.header}>
-              <View style={styles.avatarContainer}>
-                <User size={32} color="#FFFFFF" strokeWidth={2.5} />
-              </View>
-              <Text style={styles.userName}>{nombreCompleto.toUpperCase()}</Text>
-            </View>
+            {/*
+                  <View style={styles.header}>
+                    <View style={styles.avatarContainer}>
+                    <User size={32} color="#FFFFFF" strokeWidth={2.5} />
+                    </View>
+                    <Text style={styles.userName}>{nombreCompleto.toUpperCase()}</Text>
+                  </View>
+            */}
 
             <Text style={styles.mainTitle}>Consulta de Ciudadano</Text>
 
