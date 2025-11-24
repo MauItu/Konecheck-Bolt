@@ -8,8 +8,7 @@ import * as SecureStore from "expo-secure-store"
 
 // ------------------------------------------------------------------
 // ⚠️ CONFIGURACIÓN CRÍTICA: BASE URL DEL BACKEND
-// Reemplaza esto con la IP de tu máquina y el puerto 3000.
-// Ejemplo: 'http://192.168.1.10:3000/api'
+// Reemplaza esto con la IP LAN de la red wifi y el puerto 3000.
 const API_BASE_URL = "http://192.168.5.107:3000/api"
 // ------------------------------------------------------------------
 
@@ -33,7 +32,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async () => {
+  const Login = async () => {
     // 1. Prevenir doble envío y validar campos
     if (isLoading) return
 
@@ -86,6 +85,9 @@ export default function LoginPage() {
     }
   }
 
+
+
+  // Renderizado del componente
   return (
     <View style={styles.container}>
       {/* Efectos de fondo */}
@@ -137,7 +139,7 @@ export default function LoginPage() {
           <TouchableOpacity
             style={[styles.button, isLoading && styles.buttonDisabled]}
             activeOpacity={0.8}
-            onPress={handleLogin}
+            onPress={Login}
             disabled={isLoading}
           >
             {isLoading ? (
