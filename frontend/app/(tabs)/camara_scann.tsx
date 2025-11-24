@@ -4,36 +4,47 @@ import { CameraView, useCameraPermissions } from "expo-camera"
 import { useState, useEffect, useRef } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform } from "react-native"
 import { Camera, CheckCircle, RefreshCw, Zap, ZapOff } from "lucide-react-native"
-// --- CORRECCIÓN CLAVE AQUÍ ---
 import { useIsFocused } from "@react-navigation/native" 
-// Opcional: Si necesitas Stack en otro lado, pero useIsFocused debe ser de @react-navigation/native
-// import { Stack } from "expo-router" 
-// -----------------------------
-import { useCiudadanoSearch } from "@/hooks/useCiudadanoSearch"
+// import { useCiudadanoSearch } from "@/hooks/useCiudadanoSearch" // REMOVIDO
 import CiudadanoResultModal from "../components/CiudadanoResultModal"
+
+// Nueva interfaz (debe coincidir con la del Modal)
+interface CiudadanoData {
+  identificacion: string
+  nombres: string
+  apellidos: string
+  fecha_nacimiento: string
+  lugar_nacimiento: string
+  rh: string
+  tipo_documento: string
+  parsingSuccess: boolean
+}
 
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
-  const [barcode, setBarcode] = useState<string | null>(null)
+  // Ahora almacenamos el objeto de datos completo, no solo la ID
+  const [ciudadanoData, setCiudadanoData] = useState<CiudadanoData | null>(null) 
   const [modalVisible, setModalVisible] = useState(false)
   const [torch, setTorch] = useState(false) 
   
-  // Ahora el hook useIsFocused está importado correctamente
-  const isFocused = useIsFocused() 
-  const { searchCiudadano, ciudadano, error, isLoading } = useCiudadanoSearch()
+  const isFocused = useIsFocused()
+  // const { searchCiudadano, ciudadano, error, isLoading } = useCiudadanoSearch() // REMOVIDO
 
+  // Efecto para mostrar el modal inmediatamente después de escanear y parsear
   useEffect(() => {
-    if (scanned && (ciudadano || error)) {
+    if (scanned && ciudadanoData) {
+      setModalVisible(true);
+    } else if (scanned && !ciudadanoData) {
+      // Si escaneó pero el parsing falló, forzamos el modal de error
       setModalVisible(true);
     }
-  }, [ciudadano, error, scanned]);
+  }, [scanned, ciudadanoData]);
 
   useEffect(() => {
-    // Si la pantalla se enfoca, reiniciamos el escáner
     if (isFocused) {
       setScanned(false);
-      setBarcode(null);
+      setCiudadanoData(null);
     }
   }, [isFocused]);
 
@@ -42,7 +53,6 @@ export default function ScannerScreen() {
   }
 
   if (!permission.granted) {
-    // ... (Mantener el código de permisos)
     return (
       <View style={styles.permissionContainer}>
         <Camera size={56} color="#388E3C" />
@@ -60,25 +70,22 @@ export default function ScannerScreen() {
     
     // console.log(`Raw Data Scanned: ${data}`); // DEBUG: Descomentar para ver la trama cruda
 
-    const cedulaIdentificada = extractCedulaFromRaw(data, type);
+    const parsedData = parseCedulaData(data, type);
 
-    if (cedulaIdentificada) {
-      setScanned(true)
-      Vibration.vibrate()
-      setBarcode(cedulaIdentificada)
-      await searchCiudadano(cedulaIdentificada); 
-    }
+    setScanned(true)
+    Vibration.vibrate()
+    setCiudadanoData(parsedData)
+    // Ya NO se llama a searchCiudadano, solo se muestra el modal.
   }
 
   return (
     <View style={styles.container}>
-      {isFocused && !scanned && ( // Renderiza solo si está enfocada y no ha escaneado
+      {isFocused && !scanned && (
         <CameraView
           style={styles.camera}
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={{
-            // Reducimos los tipos a los esenciales para rendimiento
             barcodeTypes: ["pdf417", "qr", "code128", "ean13"], 
           }}
           onBarcodeScanned={handleBarcodeScanned}
@@ -100,44 +107,31 @@ export default function ScannerScreen() {
             </TouchableOpacity>
 
             <Text style={styles.instruction}>
-              Apunta al código. La lectura exitosa consultará tu BD.
+              Apunta al código. La lectura exitosa mostrará los datos del documento.
             </Text>
           </View>
         </CameraView>
       )}
 
-      {scanned && (
+      {/* VISTA DE CARGA (Ahora solo es una pantalla de espera mientras se abre el modal) */}
+      {scanned && !modalVisible && (
         <View style={styles.resultContainer}>
           <View style={styles.resultCard}>
-             {isLoading ? (
-               <View style={{alignItems: 'center'}}>
+            <View style={{alignItems: 'center'}}>
                   <RefreshCw size={40} color="#388E3C" className="animate-spin" />
-                  <Text style={{marginTop: 15}}>Consultando {barcode}...</Text>
-               </View>
-             ) : (
-                <View style={{alignItems: 'center'}}>
-                    <CheckCircle size={40} color="#388E3C" />
-                    <Text style={styles.resultTitle}>Lectura y Búsqueda Finalizada</Text>
-                    <Text style={styles.barcodeText}>ID: {barcode}</Text>
-                    <TouchableOpacity 
-                        style={styles.scanAgainButton} 
-                        onPress={() => setScanned(false)}
-                    >
-                        <Text style={styles.buttonText}>Escanear de nuevo</Text>
-                    </TouchableOpacity>
-                </View>
-             )}
+                  <Text style={{marginTop: 15}}>Procesando datos...</Text>
+            </View>
           </View>
         </View>
       )}
 
       <CiudadanoResultModal
         visible={modalVisible}
-        ciudadano={ciudadano}
-        error={error}
+        ciudadano={ciudadanoData}
         onClose={() => {
           setModalVisible(false)
           setScanned(false)
+          setCiudadanoData(null)
         }}
       />
     </View>
@@ -145,48 +139,90 @@ export default function ScannerScreen() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* LÓGICA DE PARSEO AVANZADA (Para obtener la cédula 794... y no el serial 033...) */
+/* FUNCIÓN DE PARSEO COMPLETO DE CÉDULA (PDF417)                              */
 /* -------------------------------------------------------------------------- */
-function extractCedulaFromRaw(raw: string, type: string): string | null {
+
+/**
+ * Intenta extraer todos los campos de datos de la cédula colombiana (PDF417).
+ * Utiliza heurística de limpieza y separación común para esta trama.
+ */
+function parseCedulaData(raw: string, type: string): CiudadanoData | null {
   
+  const baseData: CiudadanoData = {
+    identificacion: 'N/A', nombres: 'N/A', apellidos: 'N/A', 
+    fecha_nacimiento: 'N/A', lugar_nacimiento: 'N/A', rh: 'N/A', 
+    tipo_documento: 'N/A', parsingSuccess: false
+  };
+
   if (type === 'pdf417') {
+    // 1. Limpieza y estandarización del separador: 
+    // Reemplaza caracteres de control (\u001D, \r, etc.) y no alfanuméricos con un pipe (|).
+    // Esto es vital para manejar la trama sucia del PDF417.
+    const cleanedRaw = raw
+      .replace(/[^a-zA-Z0-9\s-/\.]/g, '|')
+      .replace(/\|{2,}/g, '|') // Consolida múltiples separadores
+      .replace(/^\||\|$/g, ''); // Remueve separadores al inicio/fin
+
+    const parts = cleanedRaw.split('|').filter(p => p.trim() !== '');
     
-    // 1. INTENTO ESPECÍFICO: Buscar el patrón "0P"
-    const match0P = raw.match(/0P\d*(\d{7,10})/);
-    if (match0P && match0P[1]) {
-        return match0P[1];
+    // Si la CC está estructurada por menos de 10 campos clave, el parsing es dudoso.
+    if (parts.length < 10) return {...baseData, tipo_documento: 'PDF417', parsingSuccess: false};
+
+    // Heurística de la CC Colombiana (Índices aproximados después del split):
+    // 0: Serial (ej: 033...)
+    // 1: Identificacion (ID)
+    // 2: Apellido 1
+    // 3: Apellido 2
+    // 4: Nombre 1
+    // 5: Nombre 2
+    // 7: Fecha Nacimiento (DD/MM/AAAA)
+    // 8: Lugar Nacimiento (ej: BOGOTA)
+    // 9: RH (ej: O+)
+    
+    // Asignación de datos
+    const result: CiudadanoData = {
+        ...baseData,
+        identificacion: parts[1] || baseData.identificacion,
+        apellidos: `${parts[2] || ''} ${parts[3] || ''}`.trim(),
+        nombres: `${parts[4] || ''} ${parts[5] || ''}`.trim(),
+        fecha_nacimiento: parts[7] || baseData.fecha_nacimiento,
+        lugar_nacimiento: parts[8] || baseData.lugar_nacimiento,
+        rh: parts[9] || baseData.rh,
+        tipo_documento: 'C.C. (PDF417)',
+        parsingSuccess: true
+    };
+    
+    // VALIDACIÓN CRÍTICA: Reasegurar la ID si el índice 1 era el número de serie
+    if (!/^\d{7,10}$/.test(result.identificacion)) {
+         // Si el índice 1 falló, intentamos tomar el SEGUNDO número largo de la trama original.
+         const allNumeric = Array.from(raw.matchAll(/\d{7,10}/g), m => m[0]);
+         if (allNumeric.length >= 2) {
+             result.identificacion = allNumeric[1]; // El segundo es la ID
+         } else {
+             // Falló la extracción de ID
+             result.parsingSuccess = false; 
+         }
     }
 
-    // 2. INTENTO HEURÍSTICO AVANZADO: Tomar la segunda secuencia larga
-    const allNumericSequences = Array.from(raw.matchAll(/\d{7,10}/g), m => m[0]);
-    
-    if (allNumericSequences.length >= 2) {
-        // La primera secuencia es el NÚMERO DE SERIE. La segunda es la CÉDULA.
-        return allNumericSequences[1]; 
-    } 
-    
-    if (allNumericSequences.length === 1) {
-        // Fallback 1: Si solo hay un número largo, lo devolvemos.
-        return allNumericSequences[0];
-    }
-    
-    // 3. FALLBACK SUCIO: Limpiar y tomar el inicio
-    const justNumbers = raw.replace(/\D/g, '');
-    if (justNumbers.length >= 7) {
-       const cleanNumber = justNumbers.replace(/^0+/, '');
-       if (cleanNumber.length >= 7) {
-            return cleanNumber.substring(0, 10);
-       }
-    }
+    return result;
   }
   
-  // Lógica para QR u otros códigos
-  else {
-      const match = raw.match(/\d{7,10}/);
-      if (match) return match[0];
+  // Lógica para QR (Solo ID, los demás campos serán 'N/A' si no hay BD)
+  if (type === 'qr') {
+      const idMatch = raw.match(/\d{7,10}/);
+      if (idMatch) {
+          return {
+            ...baseData,
+            identificacion: idMatch[0],
+            nombres: 'Datos no disponibles',
+            apellidos: 'Localmente',
+            tipo_documento: 'QR',
+            parsingSuccess: true
+          }
+      }
   }
 
-  return null;
+  return {...baseData, tipo_documento: type, parsingSuccess: false};
 }
 
 const styles = StyleSheet.create({
@@ -211,7 +247,4 @@ const styles = StyleSheet.create({
   
   resultContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
   resultCard: { backgroundColor: 'white', padding: 30, borderRadius: 15, width: '80%', alignItems: 'center' },
-  resultTitle: { fontSize: 18, fontWeight: 'bold', marginVertical: 15 },
-  barcodeText: { fontSize: 18, fontWeight: '600', color: '#388E3C' },
-  scanAgainButton: { backgroundColor: '#388E3C', padding: 10, borderRadius: 8, marginTop: 10 }
 })

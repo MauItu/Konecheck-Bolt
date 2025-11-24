@@ -2,112 +2,96 @@ import type React from "react"
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from "react-native"
 import { CheckCircle, XCircle, User } from "lucide-react-native"
 
+// Nueva interfaz para datos PARSEADOS localmente
 interface CiudadanoData {
   identificacion: string
   nombres: string
   apellidos: string
-  estado_judicial: string
-  fecha_nacimiento?: string
-  lugar_nacimiento?: string
-  rh?: string
-  // Propiedad opcional proveniente del hook enriquecido
-  judicialStatus?: {
-    label: string
-    color: string
-    isRequired: boolean
-  }
+  fecha_nacimiento: string
+  lugar_nacimiento: string
+  rh: string
+  tipo_documento: string
+  parsingSuccess: boolean
 }
 
 interface CiudadanoResultModalProps {
   visible: boolean
   ciudadano: CiudadanoData | null
-  error: string | null
+  // Ya no necesitamos 'error', el fallo de parsing es manejado en 'ciudadano'
   onClose: () => void
 }
 
-const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ciudadano, error, onClose }) => {
-  // Usar la propiedad judicialStatus si está disponible (viene del hook)
-  const judicial = ciudadano?.judicialStatus
+const CiudadanoResultModal: React.FC<CiudadanoResultModalProps> = ({ visible, ciudadano, onClose }) => {
+  
+  // Comprobación para el caso de fallo total
+  const parsingFailed = !ciudadano || !ciudadano.parsingSuccess
 
-  // Determinar si es requerido: prioridad -> error (muestra como error), luego judicial.isRequired si existe, si no, fallback a inspección del string
-  const fallbackRequerido =
-    ciudadano?.estado_judicial?.toUpperCase().includes("REQUERIDO") ||
-    ciudadano?.estado_judicial?.toUpperCase().includes("ACTIVO")
-
-  const isRequerido = Boolean(error) ? true : (judicial ? judicial.isRequired : fallbackRequerido)
-
-  // Labels/colores: si tenemos judicialStatus preferimos sus datos; en UI mostramos las etiquetas solicitadas:
-  // "Búsqueda Activa" cuando isRequired === true, "No Requerido" cuando isRequired === false.
-  const estadoLabel = error
-    ? "Error"
-    : judicial
-    ? (judicial.isRequired ? "Búsqueda Activa" : "No Requerido")
-    : (isRequerido ? "Búsqueda Activa" : "No Requerido")
-
-  const estadoColor = error
-    ? "#D32F2F"
-    : judicial
-    ? judicial.color
-    : (isRequerido ? "#D32F2F" : "#388E3C")
-
-  const nombreCompleto = ciudadano ? `${ciudadano.nombres} ${ciudadano.apellidos}` : "USUARIO"
+  const nombreCompleto = ciudadano ? `${ciudadano.nombres} ${ciudadano.apellidos}` : "DATOS NO ENCONTRADOS"
   const cedulaFormateada = ciudadano?.identificacion || "N/A"
 
-  // Mensaje según el estado
-  let mensajeEstado = "El ciudadano no representa antecedentes judiciales vigentes."
-  if (error) {
-    mensajeEstado = error
-  } else if (isRequerido) {
-    mensajeEstado = "El ciudadano presenta requerimientos judiciales activos."
-  } else {
-    mensajeEstado = "No Requerido."
-  }
+  // Estilos y labels basados en el resultado del parsing
+  const statusColor = parsingFailed ? "#D32F2F" : "#388E3C"
+  const statusLabel = parsingFailed ? "FALLO DE LECTURA" : "LECTURA EXITOSA"
+  const mensajeEstado = parsingFailed 
+    ? "No se pudo extraer toda la información del documento. Intente de nuevo o verifique la iluminación."
+    : "Información extraída directamente del código de barras (PDF417)."
 
   return (
     <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={styles.centeredView}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.modalView}>
-            {/*
-                  <View style={styles.header}>
-                    <View style={styles.avatarContainer}>
-                    <User size={32} color="#FFFFFF" strokeWidth={2.5} />
-                    </View>
-                    <Text style={styles.userName}>{nombreCompleto.toUpperCase()}</Text>
-                  </View>
-            */}
 
-            <Text style={styles.mainTitle}>Consulta de Ciudadano</Text>
+            <Text style={styles.mainTitle}>{statusLabel}</Text>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Registro de Ciudadano</Text>
+              <Text style={styles.cardTitle}>Datos del Documento ({ciudadano?.tipo_documento || 'PDF417'})</Text>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Nombre:</Text>
-                <Text style={styles.infoValue}>{nombreCompleto}</Text>
-              </View>
+              {parsingFailed ? (
+                // Mostrar error si el parsing falló
+                <View style={styles.errorContainer}>
+                    <XCircle size={40} color={statusColor} />
+                    <Text style={[styles.errorText, { color: statusColor }]}>{mensajeEstado}</Text>
+                </View>
+              ) : (
+                // Mostrar datos si el parsing fue exitoso
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Nombre Completo:</Text>
+                    <Text style={styles.infoValue}>{nombreCompleto.toUpperCase()}</Text>
+                  </View>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Cédula:</Text>
-                <Text style={styles.infoValue}>{cedulaFormateada}</Text>
-              </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Cédula (ID):</Text>
+                    <Text style={styles.infoValue}>{cedulaFormateada}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Fecha Nacimiento:</Text>
+                    <Text style={styles.infoValue}>{ciudadano.fecha_nacimiento}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Lugar Nacimiento:</Text>
+                    <Text style={styles.infoValue}>{ciudadano.lugar_nacimiento}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>RH:</Text>
+                    <Text style={styles.infoValue}>{ciudadano.rh}</Text>
+                  </View>
 
-              <View style={styles.statusContainer}>
-                {isRequerido ? (
-                  <XCircle size={24} color={estadoColor} strokeWidth={2.5} fill={estadoColor} />
-                ) : (
-                  <CheckCircle size={24} color={estadoColor} strokeWidth={2.5} fill={estadoColor} />
-                )}
-                <Text style={[styles.statusText, { color: estadoColor }]}>
-                  Estado Judicial: {estadoLabel}
-                </Text>
-              </View>
-
-              <Text style={styles.statusMessage}>{mensajeEstado}</Text>
+                  <View style={styles.statusContainer}>
+                    <CheckCircle size={24} color={statusColor} strokeWidth={2.5} fill={statusColor} />
+                    <Text style={[styles.statusText, { color: statusColor }]}>Datos Extraídos Localmente</Text>
+                  </View>
+                  <Text style={styles.statusMessage}>{mensajeEstado}</Text>
+                </>
+              )}
             </View>
 
             <TouchableOpacity style={styles.button} onPress={onClose}>
-              <Text style={styles.buttonText}>Nueva Consulta</Text>
+              <Text style={styles.buttonText}>Nueva Lectura</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -133,38 +117,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 500,
     alignSelf: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    marginBottom: 30,
-    gap: 12,
-  },
-  avatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#9E9E9E",
-    letterSpacing: 0.5,
   },
   mainTitle: {
     fontSize: 24,
@@ -200,15 +152,18 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    paddingBottom: 8,
   },
   infoLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#212121",
+    color: "#4CAF50", // Cambio de color para resaltar
     marginBottom: 2,
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "400",
     color: "#424242",
   },
@@ -229,6 +184,17 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: "#616161",
     lineHeight: 18,
+    paddingTop: 5,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 10,
   },
   button: {
     backgroundColor: "#4CAF50",
