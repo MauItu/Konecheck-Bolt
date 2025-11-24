@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const pool = require("../../config/database");
+const pool = require("../config/database");
 
 class AuthController {
 
@@ -66,7 +66,7 @@ class AuthController {
           nombre: usuario.nombres + " " + usuario.apellidos,
           rango: usuario.rango
         },
-        process.env.JWT_SECRET || "CAMBIAR_POR_SECRETO",
+        process.env.JWT_SECRET,
         { expiresIn: "10h" }
       );
 

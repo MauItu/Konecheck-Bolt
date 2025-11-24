@@ -9,7 +9,7 @@ class AuthMiddleware {
         return res.status(401).json({ error: 'Token no proporcionado' });
       }
 
-      const secret = process.env.JWT_SECRET || 'tu-secreto-dev';
+      const secret = process.env.JWT_SECRET;
       const decoded = jwt.verify(token, secret);
       
       req.user = decoded;

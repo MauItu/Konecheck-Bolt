@@ -2,6 +2,23 @@ const Ciudadano = require("../models/Ciudadano");
 
 class CiudadanoController {
 
+
+  async obtenerPorIdentificacion(req, res, next) { // Asegúrate de que este método esté presente
+  try {
+    const ciudadano = await Ciudadano.obtenerPorIdentificacion(req.params.identificacion);
+
+    if (!ciudadano) {
+      return res.status(404).json({ mensaje: "Ciudadano no encontrado" });
+    }
+
+    res.json(ciudadano);
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+
   async obtenerTodos(req, res, next) {
     try {
       const ciudadanos = await Ciudadano.obtenerTodos();

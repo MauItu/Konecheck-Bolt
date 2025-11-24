@@ -8,7 +8,7 @@ router.use(authMiddleware.verificar);
 
 router.get("/", ciudadanoController.obtenerTodos);
 router.get("/:id", ciudadanoController.obtenerPorId);
-router.post("/", ciudadanoController.crear);
+router.get("/:identificacion", ciudadanoController.obtenerPorIdentificacion); // Asegúrate de que esta línea esté presenterouter.post("/", ciudadanoController.crear);
 router.put("/:id", ciudadanoController.actualizar);
 router.delete("/:id", ciudadanoController.eliminar);
 
