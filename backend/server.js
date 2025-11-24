@@ -34,7 +34,7 @@ app.get('/health', (req, res) => {
 // Ruta de prueba de conexión a BD
 app.get('/test-connection', async (req, res) => {
   try {
-    const pool = require('./src/config/database');
+    const pool = require('./config/database');
     const result = await pool.query('SELECT NOW() as current_time, version() as pg_version');
     
     res.json({

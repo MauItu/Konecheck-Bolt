@@ -1,4 +1,4 @@
-const pool = require("../config/database"); // Corrected to use pool
+const pool = require("../../config/database"); // Corrected to use pool
 
 class Ciudadano {
   async obtenerTodos() {

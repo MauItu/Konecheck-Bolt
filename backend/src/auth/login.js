@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const pool = require("../config/database"); // IMPORTA TU BD CORRECTAMENTE
+const pool = require("../../config/database"); // IMPORTA TU BD CORRECTAMENTE
 
 exports.login = async (req, res) => {
   try {

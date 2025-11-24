@@ -1,5 +1,5 @@
 // Usuario Model - Consultas SQL para tabla usuario_fuerza_publica
-const pool = require("../config/database");
+const pool = require("../../config/database");
 
 class Usuario {
 
