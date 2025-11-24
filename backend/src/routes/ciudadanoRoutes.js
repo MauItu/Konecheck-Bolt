@@ -1,15 +1,15 @@
-// Ciudadano Routes - Endpoints de búsqueda y filtrado
-const express = require("express")
-const router = express.Router()
-const ciudadanoController = require("../controllers/ciudadanoController")
-const authMiddleware = require("../middleware/auth-middleware")
+const express = require("express");
+const router = express.Router();
+const ciudadanoController = require("../controllers/ciudadanoController");
+const authMiddleware = require("../middleware/auth-middleware");
 
-// Requieren autenticación
-router.use(authMiddleware.verificar)
+// TODAS las rutas protegidas
+router.use(authMiddleware.verificar);
 
-router.get("/", ciudadanoController.listar)
-router.get("/buscar", ciudadanoController.buscar)
-router.get("/filtrar", ciudadanoController.filtrar)
-router.get("/documento/:id", ciudadanoController.obtenerDocumento)
+router.get("/", ciudadanoController.obtenerTodos);
+router.get("/:id", ciudadanoController.obtenerPorId);
+router.post("/", ciudadanoController.crear);
+router.put("/:id", ciudadanoController.actualizar);
+router.delete("/:id", ciudadanoController.eliminar);
 
-module.exports = router
+module.exports = router;

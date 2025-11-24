@@ -7,7 +7,6 @@ const app = express();
 const authRoutes = require('./src/routes/authRoutes');
 const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const ciudadanoRoutes = require('./src/routes/ciudadanoRoutes');
-const reporteRoutes = require('./src/routes/reporteRoutes');
 const errorHandler = require('./src/middleware/error-handler');
 
 // Middlewares globales
@@ -60,7 +59,7 @@ app.get('/test-connection', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/ciudadanos', ciudadanoRoutes);
-app.use('/api/reportes', reporteRoutes);
+
 
 // Manejo de rutas no encontradas
 app.use((req, res) => {

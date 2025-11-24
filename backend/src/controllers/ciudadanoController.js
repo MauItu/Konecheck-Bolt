@@ -1,56 +1,61 @@
-// Ciudadano Controller - Búsqueda y filtrado de ciudadanos
-const Ciudadano = require("../models/Ciudadano")
-const Documento = require("../models/Documento")
+const Ciudadano = require("../models/Ciudadano");
 
 class CiudadanoController {
-  async listar(req, res, next) {
+
+  async obtenerTodos(req, res, next) {
     try {
-      const ciudadanos = await Ciudadano.listar()
-      res.json(ciudadanos)
+      const ciudadanos = await Ciudadano.obtenerTodos();
+      res.json(ciudadanos);
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
 
-  async buscar(req, res, next) {
+  async obtenerPorId(req, res, next) {
     try {
-      const { nombre, cedula } = req.query
+      const ciudadano = await Ciudadano.obtenerPorId(req.params.id);
 
-      if (!nombre && !cedula) {
-        return res.status(400).json({ error: "Parámetros de búsqueda requeridos" })
+      if (!ciudadano) {
+        return res.status(404).json({ mensaje: "Ciudadano no encontrado" });
       }
 
-      const resultados = await Ciudadano.buscar({ nombre, cedula })
-      res.json(resultados)
+      res.json(ciudadano);
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
 
-  async filtrar(req, res, next) {
+  async crear(req, res, next) {
     try {
-      const { estado, ciudad, edad } = req.query
-      const ciudadanos = await Ciudadano.filtrar({ estado, ciudad, edad })
-      res.json(ciudadanos)
+      const ciudadano = await Ciudadano.crear(req.body);
+      res.status(201).json({ mensaje: "Ciudadano creado", ciudadano });
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
 
-  async obtenerDocumento(req, res, next) {
+  async actualizar(req, res, next) {
     try {
-      const { id } = req.params
-      const documento = await Documento.obtenerPorCiudadanoId(id)
+      const ciudadano = await Ciudadano.actualizar(req.params.id, req.body);
 
-      if (!documento) {
-        return res.status(404).json({ error: "Documento no encontrado" })
+      if (!ciudadano) {
+        return res.status(404).json({ mensaje: "Ciudadano no encontrado" });
       }
 
-      res.json(documento)
+      res.json({ mensaje: "Ciudadano actualizado", ciudadano });
     } catch (error) {
-      next(error)
+      next(error);
+    }
+  }
+
+  async eliminar(req, res, next) {
+    try {
+      await Ciudadano.eliminar(req.params.id);
+      res.json({ mensaje: "Ciudadano eliminado" });
+    } catch (error) {
+      next(error);
     }
   }
 }
 
-module.exports = new CiudadanoController()
+module.exports = new CiudadanoController();

@@ -1,84 +1,90 @@
-// authController.js
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const pool = require("../../config/database.js");
-const { validateEmail, validatePassword } = require("../../utils/validators");
+const pool = require("../../config/database");
 
 class AuthController {
-  // LOGIN
+
   async login(req, res, next) {
     try {
-      const { email, password } = req.body;
+      console.log("BODY LOGIN:", req.body);
 
-      if (!validateEmail(email)) return res.status(400).json({ error: "Email inválido" });
-      if (!validatePassword(password)) return res.status(400).json({ error: "Contraseña inválida" });
+      const { identificacion, password } = req.body;
 
-  // 1. Buscar admin por correo
-const { rows } = await pool.query(
-  `SELECT a.id, a.correo, a.password, p.nombres, p.apellidos
-   FROM administradores a
-   JOIN personas p ON p.id = a.id
-   WHERE a.correo = $1`,
-  [email]
-);
-const admin = rows[0];
+      if (!identificacion || !password) {
+        return res.status(400).json({
+          mensaje: "Debe enviar identificación y password"
+        });
+      }
 
-      if (!admin) return res.status(401).json({ error: "Credenciales incorrectas" });
+      // Buscar usuario
+      const { rows } = await pool.query(
+        `SELECT 
+            id,
+            identificacion,
+            nombres,
+            apellidos,
+            password,
+            rango
+         FROM usuario_fuerza_publica
+         WHERE identificacion = $1`,
+        [identificacion]
+      );
 
-      // 2. Verificar password
-      const ok = await bcrypt.compare(password, admin.password);
-      if (!ok) return res.status(401).json({ error: "Credenciales incorrectas" });
+      const usuario = rows[0];
 
-      // 3. Generar JWT
-      const token = jwt.sign({ id: admin.id, email: admin.correo }, process.env.JWT_SECRET, {
-        expiresIn: "7d",
-      });
+      if (!usuario) {
+        return res.status(404).json({ mensaje: "Usuario no encontrado" });
+      }
 
-      // 4. Responder con token y datos
+      // --------------------------------------
+      // 🔥 Validación híbrida de contraseña 🔥
+      // --------------------------------------
+
+      let passwordValida = false;
+      const storedPassword = usuario.password;
+
+      // Detectar si es hash bcrypt
+      const esHash = storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$");
+
+      if (esHash) {
+        // Comparar usando bcrypt
+        passwordValida = await bcrypt.compare(password, storedPassword);
+      } else {
+        // Comparar como texto plano
+        passwordValida = password === storedPassword;
+      }
+
+      if (!passwordValida) {
+        return res.status(401).json({ mensaje: "Contraseña incorrecta" });
+      }
+
+      // Crear token
+      const token = jwt.sign(
+        {
+          id: usuario.id,
+          identificacion: usuario.identificacion,
+          nombre: usuario.nombres + " " + usuario.apellidos,
+          rango: usuario.rango
+        },
+        process.env.JWT_SECRET || "CAMBIAR_POR_SECRETO",
+        { expiresIn: "10h" }
+      );
+
       res.json({
-        message: "Login exitoso",
+        mensaje: "Login exitoso",
         token,
         usuario: {
-          id: admin.id,
-          nombre: `${admin.nombres} ${admin.apellidos}`,
-          email: admin.correo,
-        },
+          id: usuario.id,
+          identificacion: usuario.identificacion,
+          nombres: usuario.nombres,
+          apellidos: usuario.apellidos,
+          rango: usuario.rango
+        }
       });
+
     } catch (error) {
       next(error);
     }
-  }
-
-  // REGISTRO (placeholder)
-  async register(req, res, next) {
-    try {
-      const { email, password, nombre } = req.body;
-      if (!email || !password || !nombre) {
-        return res.status(400).json({ error: "Campos requeridos faltantes" });
-      }
-      res.status(201).json({ message: "Usuario registrado exitosamente" });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // VERIFICAR SESIÓN
-  async verificarSesion(req, res, next) {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) return res.status(401).json({ error: "No hay token" });
-
-      const token = authHeader.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      res.json({ autenticado: true, usuario: decoded });
-    } catch (error) {
-      return res.status(401).json({ error: "Token inválido" });
-    }
-  }
-
-  // LOGOUT
-  async logout(req, res, next) {
-    res.json({ message: "Logout exitoso" });
   }
 }
 
