@@ -2,14 +2,12 @@
 
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform } from "react-native"
-import { Camera, CheckCircle, RefreshCw, Zap, ZapOff } from "lucide-react-native"
+import { View, Text, StyleSheet, TouchableOpacity, Vibration } from "react-native"
+import { Camera, RefreshCw, Zap, ZapOff } from "lucide-react-native"
 import { useIsFocused } from "@react-navigation/native" 
-// Importación del hook y la interfaz (ahora disponible)
-import { useCiudadanoSearch, CiudadanoData } from "@/hooks/useCiudadanoSearch" 
+import { useCiudadanoSearch } from "@/hooks/useCiudadanoSearch" 
 import CiudadanoResultModal from "../components/CiudadanoResultModal"
 
-// Interface temporal para el resultado del parsing de ID 
 interface ParsedIdResult {
   identificacion: string;
   parsingSuccess: boolean;
@@ -18,21 +16,19 @@ interface ParsedIdResult {
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
-  const [barcode, setBarcode] = useState<string | null>(null) // ID para la búsqueda
+  const [barcode, setBarcode] = useState<string | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [torch, setTorch] = useState(false) 
   
   const isFocused = useIsFocused()
   const { searchCiudadano, ciudadano, error, isLoading } = useCiudadanoSearch() 
 
-  // Efecto para abrir el modal cuando la búsqueda termina (con o sin error/datos)
   useEffect(() => {
-    if (scanned && !isLoading && (ciudadano || error || barcode === null)) {
+    if (scanned && !isLoading && (ciudadano || error)) {
       setModalVisible(true);
     }
   }, [ciudadano, error, isLoading, scanned]);
 
-  // Efecto para resetear el estado cuando la pantalla gana foco (vuelve a la pestaña)
   useEffect(() => {
     if (isFocused) {
       setScanned(false);
@@ -45,9 +41,9 @@ export default function ScannerScreen() {
     return (
         <View style={styles.permissionContainer}>
             <Camera size={56} color="#388E3C" />
-            <Text style={styles.messageTitle}>Permiso Requerido</Text>
+            <Text style={styles.messageTitle}>Permiso de Cámara</Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-                <Text style={styles.buttonText}>Solicitar Permiso</Text>
+                <Text style={styles.buttonText}>Activar Cámara</Text>
             </TouchableOpacity>
         </View>
     );
@@ -56,20 +52,22 @@ export default function ScannerScreen() {
   const handleBarcodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return
     
-    // Extraemos la ID usando la lógica mejorada 
-    const cedulaIdentificada = parseCedulaId(data, type);
+    console.log("Datos crudos leídos (PDF417):", data); 
 
-    if (cedulaIdentificada.parsingSuccess && cedulaIdentificada.identificacion !== 'N/A') {
+    // 🔥 LÓGICA DE EXTRACCIÓN SIMPLIFICADA
+    const resultadoLectura = parseCedulaId(data);
+
+    if (resultadoLectura.parsingSuccess) {
+      console.log("Cédula Limpia SELECCIONADA (FINAL):", resultadoLectura.identificacion); 
+      
       setScanned(true)
       Vibration.vibrate()
-      setBarcode(cedulaIdentificada.identificacion)
-      // Usamos el ID correcto para buscar en la BD
-      await searchCiudadano(cedulaIdentificada.identificacion); 
+      setBarcode(resultadoLectura.identificacion)
+      
+      // Enviamos el número LIMPIO a la base de datos
+      await searchCiudadano(resultadoLectura.identificacion); 
     } else {
-        // Fallo en la extracción de la ID
-        setScanned(true); 
-        setBarcode(null);
-        setModalVisible(true); 
+       console.log("No se pudo extraer una cédula válida de los datos leídos."); 
     }
   }
 
@@ -81,55 +79,40 @@ export default function ScannerScreen() {
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={{
-            barcodeTypes: ["pdf417", "qr", "code128", "ean13"], 
+            barcodeTypes: ["pdf417", "qr"], 
           }}
           onBarcodeScanned={handleBarcodeScanned}
         >
           <View style={styles.overlay}>
-            <View style={styles.scanArea}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
-            </View>
+             <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.tl]} />
+                <View style={[styles.corner, styles.tr]} />
+                <View style={[styles.corner, styles.bl]} />
+                <View style={[styles.corner, styles.br]} />
+             </View>
 
             <TouchableOpacity 
               style={styles.torchButton} 
               onPress={() => setTorch(!torch)}
             >
               {torch ? <ZapOff color="white" size={24} /> : <Zap color="white" size={24} />}
-              <Text style={styles.torchText}>Flash</Text>
+              <Text style={styles.torchText}>Luz</Text>
             </TouchableOpacity>
 
             <Text style={styles.instruction}>
-              Apunta al código. La lectura exitosa consultará tu BD.
+              Enfoque la parte trasera de la cédula (Código de Barras)
             </Text>
           </View>
         </CameraView>
       )}
 
-      {/* Pantalla de Carga/Resultado */}
+      {/* Loading Overlay */}
       {scanned && !modalVisible && (
-        <View style={styles.resultContainer}>
-          <View style={styles.resultCard}>
-             {isLoading ? (
-               <View style={{alignItems: 'center'}}>
-                  <RefreshCw size={40} color="#388E3C" style={{ opacity: 1 }} />
-                  <Text style={{marginTop: 15, fontSize: 16, fontWeight: '600'}}>Consultando {barcode || 'ID...'} en BD...</Text>
-               </View>
-             ) : (
-                <View style={{alignItems: 'center'}}>
-                    <CheckCircle size={40} color="#388E3C" />
-                    <Text style={styles.resultTitle}>Búsqueda Finalizada</Text>
-                    <Text style={styles.barcodeText}>ID: {barcode || 'N/A'}</Text>
-                    <TouchableOpacity 
-                        style={styles.scanAgainButton} 
-                        onPress={() => setScanned(false)}
-                    >
-                        <Text style={styles.buttonText}>Escanear de nuevo</Text>
-                    </TouchableOpacity>
-                </View>
-             )}
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+             <RefreshCw size={40} color="#388E3C" className="animate-spin" />
+             <Text style={styles.loadingTitle}>Verificando Huella...</Text>
+             <Text style={styles.loadingSubtitle}>Consultando base de datos...</Text>
           </View>
         </View>
       )}
@@ -137,8 +120,7 @@ export default function ScannerScreen() {
       <CiudadanoResultModal
         visible={modalVisible}
         ciudadano={ciudadano} 
-        // Mostrar error de hook, o un error de parsing si se escaneó pero no se extrajo ID
-        error={error || (scanned && barcode === null ? "No se pudo extraer una ID válida del código de barras. Intente de nuevo." : null)} 
+        error={error} 
         onClose={() => {
           setModalVisible(false)
           setScanned(false)
@@ -148,84 +130,75 @@ export default function ScannerScreen() {
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/* FUNCIÓN DE PARSEO DE ID (Prioriza la cédula sobre el serial)               */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Extrae SOLO el número de identificación, priorizando la cédula (79466685)
- * y evitando capturar el número de serie (ej. 1070803300).
- *
- * Cambios claves:
- * - Decodifica caracteres %0A y elimina saltos de línea.
- * - Si se detecta explícitamente la cédula conocida (79466685), la devuelve.
- * - Filtra cualquier número que empiece por 1070 (seriales típicos) y no lo toma.
- * - Si hay ambigüedad, toma la segunda secuencia larga por heurística.
+ * 🔥 ALGORITMO SIMPLE Y DIRECTO (Cédula moderna)
+ * Busca solo la primera secuencia de 10 dígitos que empiece por '1' en la cadena cruda.
  */
-function parseCedulaId(raw: string, type: string): ParsedIdResult {
-    const base: ParsedIdResult = { identificacion: 'N/A', parsingSuccess: false };
+function parseCedulaId(raw: string): ParsedIdResult {
+    
+    // 1. Buscamos el patrón 1 seguido de 9 dígitos (1\d{9}) en toda la cadena.
+    // El 'g' es para búsqueda global, pero match() sin 'g' en JavaScript retorna la primera coincidencia, lo cual es ideal aquí.
+    const nuipRegex = /1\d{9}/; 
+    const nuipMatch = raw.match(nuipRegex); 
 
-    // Normalizar: decodificar URL encoded y quitar saltos de línea/espacios raros
-    try {
-        raw = decodeURIComponent(raw);
-    } catch (e) {
-        // si falla la decodificación, usamos el raw tal cual
+    if (nuipMatch) {
+        // En tu caso, esto encontrará '1025523117' en la secuencia '...850678261025523117...'
+        const extractedNuip = nuipMatch[0];
+        console.log("¡Éxito! Cédula moderna de 10 dígitos encontrada:", extractedNuip);
+        return { identificacion: extractedNuip, parsingSuccess: true };
     }
-    raw = raw.replace(/\r|\n|\s|%0A/g, ' ');
+    
+    // 2. Fallback para cédulas antiguas (6-8 dígitos)
+    // Solo si no se encontró el NUIP de 10 dígitos.
+    
+    // Aislamos todos los bloques numéricos
+    const matches = raw.replace(/[^0-9]/g, ' ').match(/\d+/g);
 
-    // 1) Si el texto contiene explícitamente la cédula conocida, devolverla de inmediato
-    const KNOWN_CEDULA = '79466685';
-    if (raw.includes(KNOWN_CEDULA)) {
-        return { identificacion: KNOWN_CEDULA, parsingSuccess: true };
+    if (matches) {
+        for (const rawCandidate of matches) {
+            // Eliminamos ceros a la izquierda y buscamos cédulas antiguas
+            const cleanCandidate = Number(rawCandidate).toString();
+            const len = cleanCandidate.length;
+
+            if (len >= 6 && len <= 8) {
+                 // Descartamos si parece fecha (19xx o 20xx)
+                 if (len === 8 && (cleanCandidate.startsWith('19') || cleanCandidate.startsWith('20'))) {
+                     continue;
+                 }
+                 console.log("Fallback: Cédula antigua (6-8 dígitos) seleccionada:", cleanCandidate);
+                 return { identificacion: cleanCandidate, parsingSuccess: true };
+            }
+        }
     }
 
-    // 2) Extraer todas las secuencias numéricas largas (7 a 10 dígitos)
-    const allNumericSequences = Array.from(raw.matchAll(/\\d{7,10}/g), m => m[0]);
-
-    // 3) Filtrar seriales que empiezan por 1070 (o cualquier otro patrón problemático)
-    const filtered = allNumericSequences.filter(n => !n.startsWith('1070'));
-
-    // 4) Si después del filtrado hay al menos una, devolver la primera (la cédula)
-    if (filtered.length >= 1) {
-        return { identificacion: filtered[0], parsingSuccess: true };
-    }
-
-    // 5) Heurística: si hay al menos 2 secuencias, tomar la segunda (a veces la cédula es la 2ª)
-    if (allNumericSequences.length >= 2) {
-        return { identificacion: allNumericSequences[1], parsingSuccess: true };
-    }
-
-    // 6) Fallback: si hay al menos una, devolverla
-    if (allNumericSequences.length === 1) {
-        return { identificacion: allNumericSequences[0], parsingSuccess: true };
-    }
-
-    return base;
+    // 3. Ningún patrón de cédula encontrado
+    console.log("Fallo total: No se encontró ningún patrón de cédula válido.");
+    return { identificacion: '', parsingSuccess: false };
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
-  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
-  scanArea: { width: 280, height: 280, position: 'relative' },
-  corner: { position: 'absolute', width: 40, height: 40, borderColor: '#66BB6A' },
-  topLeft: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 },
-  topRight: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 },
-  bottomLeft: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 },
-  bottomRight: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 },
-  instruction: { color: 'white', marginTop: 20, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 5 },
-  torchButton: { position: 'absolute', bottom: 100, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', padding: 10, borderRadius: 20, right: 20 },
-  torchText: { color: 'white', fontSize: 12, marginTop: 4 },
+  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   
-  permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white', padding: 20 },
-  messageTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 20 },
-  message: { textAlign: 'center', marginTop: 10, marginBottom: 20, color: '#666' },
-  permissionButton: { backgroundColor: '#388E3C', padding: 15, borderRadius: 10 },
+  scanFrame: { width: 320, height: 220, position: 'relative' },
+  corner: { position: 'absolute', width: 40, height: 40, borderColor: '#388E3C', borderWidth: 5 },
+  tl: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+  tr: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+  bl: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+  br: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+
+  instruction: { color: 'white', marginTop: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, overflow: 'hidden', fontWeight: 'bold', textAlign: 'center' },
+  torchButton: { position: 'absolute', bottom: 60, right: 30, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', padding: 12, borderRadius: 50 },
+  torchText: { color: 'white', fontSize: 10, marginTop: 4 },
+  
+  permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' },
+  messageTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 20, color: '#333' },
+  permissionButton: { backgroundColor: '#388E3C', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 10, marginTop: 20 },
   buttonText: { color: 'white', fontWeight: 'bold' },
   
-  resultContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
-  resultCard: { backgroundColor: 'white', padding: 30, borderRadius: 15, width: '80%', alignItems: 'center' },
-  resultTitle: { fontSize: 18, fontWeight: 'bold', marginVertical: 15 },
-  barcodeText: { fontSize: 18, fontWeight: '600', color: '#388E3C' },
-  scanAgainButton: { backgroundColor: '#388E3C', padding: 10, borderRadius: 8, marginTop: 10 }
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)' },
+  loadingCard: { backgroundColor: 'white', padding: 25, borderRadius: 16, alignItems: 'center', width: '85%' },
+  loadingTitle: { marginTop: 15, fontSize: 18, fontWeight: 'bold', color: '#333' },
+  loadingSubtitle: { marginTop: 5, fontSize: 14, color: '#666' },
 })

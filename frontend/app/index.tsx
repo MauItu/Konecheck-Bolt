@@ -7,7 +7,7 @@ import * as SecureStore from "expo-secure-store"
 // ------------------------------------------------------------------
 // ⚠️ CONFIGURACIÓN CRÍTICA: BASE URL DEL BACKEND
 // Reemplaza esto con la IP LAN de la red wifi y el puerto 3000.
-const API_BASE_URL = "http://192.168.5.107:3000/api"
+const API_BASE_URL = "http://172.20.10.3:3000/api"
 // ------------------------------------------------------------------
 
 // Función auxiliar para guardar el token de forma condicional
