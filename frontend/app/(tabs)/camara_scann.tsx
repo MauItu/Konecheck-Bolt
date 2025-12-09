@@ -56,10 +56,13 @@ export default function ScannerScreen() {
   const handleBarcodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return
     
+    console.log("Datos crudos leídos (PDF417):", data); 
+    
     // Extraemos la ID usando la lógica mejorada 
     const cedulaIdentificada = parseCedulaId(data, type);
 
     if (cedulaIdentificada.parsingSuccess && cedulaIdentificada.identificacion !== 'N/A') {
+      console.log("Cédula Limpia SELECCIONADA (FINAL):", cedulaIdentificada.identificacion); 
       setScanned(true)
       Vibration.vibrate()
       setBarcode(cedulaIdentificada.identificacion)
@@ -148,20 +151,7 @@ export default function ScannerScreen() {
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/* FUNCIÓN DE PARSEO DE ID (Prioriza la cédula sobre el serial)               */
-/* -------------------------------------------------------------------------- */
 
-/**
- * Extrae SOLO el número de identificación, priorizando la cédula (79466685)
- * y evitando capturar el número de serie (ej. 1070803300).
- *
- * Cambios claves:
- * - Decodifica caracteres %0A y elimina saltos de línea.
- * - Si se detecta explícitamente la cédula conocida (79466685), la devuelve.
- * - Filtra cualquier número que empiece por 1070 (seriales típicos) y no lo toma.
- * - Si hay ambigüedad, toma la segunda secuencia larga por heurística.
- */
 function parseCedulaId(raw: string, type: string): ParsedIdResult {
     const base: ParsedIdResult = { identificacion: 'N/A', parsingSuccess: false };
 
@@ -173,33 +163,43 @@ function parseCedulaId(raw: string, type: string): ParsedIdResult {
     }
     raw = raw.replace(/\r|\n|\s|%0A/g, ' ');
 
-    // 1) Si el texto contiene explícitamente la cédula conocida, devolverla de inmediato
-    const KNOWN_CEDULA = '79466685';
-    if (raw.includes(KNOWN_CEDULA)) {
-        return { identificacion: KNOWN_CEDULA, parsingSuccess: true };
+
+
+    // 2. EXTRACCIÓN ROBUSTA: Buscar el patrón de 10 dígitos (NUIP) que empieza por '1'
+    const nuipRegex = /1\d{9}/; 
+    const nuipMatch = raw.match(nuipRegex); 
+
+    if (nuipMatch) {
+        // Esto extraerá la cédula moderna incluso si está pegada a otros números
+        const extractedNuip = nuipMatch[0];
+        console.log("Prioridad 2: Cédula moderna de 10 dígitos encontrada por patrón:", extractedNuip);
+        return { identificacion: extractedNuip, parsingSuccess: true };
+    }
+    
+    
+    // 3. FALLBACK: Búsqueda general de números (para cédulas antiguas/otros formatos)
+    
+    // Extraemos todos los bloques numéricos separados por cualquier cosa que no sea dígito
+    const matches = raw.replace(/[^0-9]/g, ' ').match(/\d+/g);
+
+    if (matches) {
+        for (const rawCandidate of matches) {
+            // Eliminamos ceros a la izquierda para tener el número limpio
+            const cleanCandidate = Number(rawCandidate).toString();
+            const len = cleanCandidate.length;
+
+            // Cédula antigua: 6-8 dígitos (excluyendo lo que parezca fecha de 8 dígitos)
+            if (len >= 6 && len <= 8) {
+                 if (len === 8 && (cleanCandidate.startsWith('19') || cleanCandidate.startsWith('20'))) {
+                     continue; // Es probable que sea una fecha
+                 }
+                 console.log("Prioridad 3: Cédula antigua (6-8 dígitos) seleccionada:", cleanCandidate);
+                 return { identificacion: cleanCandidate, parsingSuccess: true };
+            }
+        }
     }
 
-    // 2) Extraer todas las secuencias numéricas largas (7 a 10 dígitos)
-    const allNumericSequences = Array.from(raw.matchAll(/\\d{7,10}/g), m => m[0]);
-
-    // 3) Filtrar seriales que empiezan por 1070 (o cualquier otro patrón problemático)
-    const filtered = allNumericSequences.filter(n => !n.startsWith('1070'));
-
-    // 4) Si después del filtrado hay al menos una, devolver la primera (la cédula)
-    if (filtered.length >= 1) {
-        return { identificacion: filtered[0], parsingSuccess: true };
-    }
-
-    // 5) Heurística: si hay al menos 2 secuencias, tomar la segunda (a veces la cédula es la 2ª)
-    if (allNumericSequences.length >= 2) {
-        return { identificacion: allNumericSequences[1], parsingSuccess: true };
-    }
-
-    // 6) Fallback: si hay al menos una, devolverla
-    if (allNumericSequences.length === 1) {
-        return { identificacion: allNumericSequences[0], parsingSuccess: true };
-    }
-
+    console.log("Fallo total: No se encontró ningún patrón de cédula válido.");
     return base;
 }
 

@@ -20,8 +20,7 @@ export interface CiudadanoData {
   // ... (Asegúrate de que coincida con lo que devuelve CiudadanoController.js)
 }
 
-// ⚠️ IMPORTANTE: Reemplaza [TU_IP_AQUI] con la IP Local de tu PC
-const API_BASE_URL = 'http://192.168.26.137:3000/api'; 
+const API_BASE_URL = 'http://172.20.10.3:3000/api'; 
 
 
 // ----------------------------------------------------------------------
@@ -48,22 +47,6 @@ export function useCiudadanoSearch() {
     const value = (raw || '').trim();
     const lower = value.toLowerCase();
 
-    // Opciones esperadas: "Búsqueda Activa" (requerido) y "No Requerido" (no requerido)
-    if (lower.includes('búsqueda') || lower.includes('busqueda') || lower.includes('activa')) {
-      return {
-        label: 'Requerido (Búsqueda Activa)',
-        color: '#D32F2F', // rojo
-        isRequired: true,
-      };
-    }
-
-    if (lower.includes('no') && lower.includes('requer')) {
-      return {
-        label: 'No Requerido',
-        color: '#388E3C', // verde
-        isRequired: false,
-      };
-    }
 
     // Fallbacks: si contiene la palabra 'no' -> no requerido, si contiene 'buscar'/'búsqueda' -> requerido
     if (lower.includes('no')) {
@@ -134,7 +117,6 @@ export function useCiudadanoSearch() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          // 🔥 LÍNEA CLAVE: El token se envía en el encabezado Authorization
           'Authorization': `Bearer ${token}`, 
         },
       });
